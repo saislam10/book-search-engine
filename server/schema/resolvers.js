@@ -1,52 +1,73 @@
 const { User } = require('../models');
+const { signToken } = require("../utils/auth");
+const { AuthenticationError } = require("apollo-server-express");
 
 const resolvers = {
+    
     Query: {
-        async getSingleUser(parent, { user = null, params },) {
-            const foundUser = await User.findOne({
-                $or: [{ _id: user ? user._id : params.id }, { username: params.username }],
-            });
+        getSingleUser: async (parent, args, context) => {
 
-            return foundUser;
+            if (context.user) {
+                const userData = await User.findOne({})
+                    .populate('books')
+
+                return userData;
+            }
+
+            throw new AuthenticationError('Not logged in')
+
         },
+
     },
     Mutation: {
-        async createUser(parent, { body },) {
+        createUser: async (parent, { body },) => {
             const user = await User.create(body);
             const token = signToken(user);
             return { token, user };
         },
-        // login a user, sign a token, and send it back (to client/src/components/LoginForm.js)
-        // {body} is destructured req.body
-        async login(parent, { body },) {
+        login: async (parent, { body },) => {
             const user = await User.findOne({ $or: [{ username: body.username }, { email: body.email }] })
 
+            if (!user) {
+                throw new AuthenticationError('No user found with this email address');
+            }
             const correctPw = await user.isCorrectPassword(body.password);
+
+            if (!correctPw) {
+                throw new AuthenticationError('Incorrect credentials');
+            }
+
             const token = signToken(user);
             return { token, user };
-        },
-        // save a book to a user's `savedBooks` field by adding it to the set (to prevent duplicates)
-        // user comes from `req.user` created in the auth middleware function
-        async saveBook(parent, { user, body },) {
-            console.log(user);
-
-            const updatedUser = await User.findOneAndUpdate(
-                { _id: user._id },
-                { $addToSet: { savedBooks: body } },
-                { new: true, runValidators: true }
-            );
-            return updatedUser;
 
         },
-        // remove a book from `savedBooks`
-        async deleteBook(parent, { user, params },) {
-            const updatedUser = await User.findOneAndUpdate(
-                { _id: user._id },
-                { $pull: { savedBooks: { bookId: params.bookId } } },
-                { new: true }
-            );
-            return updatedUser;
+        saveBook: async (parent, args, context) => {
+            if (context.user) {
+
+                const updatedUser = await User.findByIdAndUpdate(
+                    { _id: context.user._id },
+                    { $addToSet: { savedBooks: args.input } },
+                    { new: true }
+                );
+
+                return updatedUser;
+            }
+
+            throw new AuthenticationError('You need to be logged in!');
         },
+        deleteBook: async (parent, args, context) => {
+            if (context.user) {
+                const updatedUser = await User.findOneAndUpdate(
+                    { _id: context.user._id },
+                    { $pull: { savedBooks: { bookId: args.bookId } } },
+                    { new: true }
+                );
+
+                return updatedUser;
+            }
+
+            throw new AuthenticationError('You need to be logged in!');
+        }
     }
 }
 
