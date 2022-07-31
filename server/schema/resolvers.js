@@ -3,7 +3,6 @@ const { signToken } = require("../utils/auth");
 const { AuthenticationError } = require("apollo-server-express");
 
 const resolvers = {
-    
     Query: {
         getSingleUser: async (parent, args, context) => {
 
@@ -25,21 +24,22 @@ const resolvers = {
             const token = signToken(user);
             return { token, user };
         },
-        login: async (parent, { body },) => {
-            const user = await User.findOne({ $or: [{ username: body.username }, { email: body.email }] })
+        login: async (parent, {email, password}) => {
+            const user = await User.findOne({email});
 
-            if (!user) {
-                throw new AuthenticationError('No user found with this email address');
+            if(!user) {
+                throw new AuthenticationError('Incorrect credentials');
             }
-            const correctPw = await user.isCorrectPassword(body.password);
 
-            if (!correctPw) {
+            const correctPw = await user.isCorrectPassword(password);
+
+            if(!correctPw) {
                 throw new AuthenticationError('Incorrect credentials');
             }
 
             const token = signToken(user);
-            return { token, user };
-
+            return {token, user};
+    
         },
         saveBook: async (parent, args, context) => {
             if (context.user) {
