@@ -18,9 +18,10 @@ const resolvers = {
   Mutation: {
 
     addUser: async (parent, args) => {
+      console.log(args);
       const user = await User.create(args);
       const token = signToken(user);
-
+      console.log('token', token);
       return { token, user };
     },
 
@@ -47,13 +48,13 @@ const resolvers = {
         const updatedUser = await User.findByIdAndUpdate(
           { _id: context.user._id },
           { $addToSet: { savedBooks: args.input } },
-          { new: true }
+          { new: true, runValidators: true }
         );
 
         return updatedUser;
       }
 
-      throw new AuthenticationError('You need to be logged in!');
+      throw new AuthenticationError("You need to be logged in!");
     },
 
 
